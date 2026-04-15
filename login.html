@@ -1,0 +1,246 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>NutriAI Login</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+        
+        .container {
+            background: white;
+            padding: 40px;
+            border-radius: 15px;
+            box-shadow: 0 10px 40px rgba(0, 0, 0, 0.2);
+            width: 100%;
+            max-width: 400px;
+        }
+        
+        h2 {
+            text-align: center;
+            color: #333;
+            margin-bottom: 30px;
+            font-size: 28px;
+        }
+        
+        .form-group {
+            margin-bottom: 20px;
+        }
+        
+        input {
+            width: 100%;
+            padding: 12px 15px;
+            border: 2px solid #e0e0e0;
+            border-radius: 8px;
+            font-size: 14px;
+            transition: border-color 0.3s;
+        }
+        
+        input:focus {
+            outline: none;
+            border-color: #667eea;
+        }
+        
+        .button-group {
+            display: flex;
+            gap: 10px;
+            margin-top: 30px;
+        }
+        
+        button {
+            flex: 1;
+            padding: 12px;
+            border: none;
+            border-radius: 8px;
+            font-size: 14px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+        
+        #loginBtn {
+            background: #667eea;
+            color: white;
+        }
+        
+        #loginBtn:hover {
+            background: #5568d3;
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(102, 126, 234, 0.4);
+        }
+        
+        #signupBtn {
+            background: #f0f0f0;
+            color: #333;
+            border: 2px solid #667eea;
+        }
+        
+        #signupBtn:hover {
+            background: #667eea;
+            color: white;
+        }
+        
+        .message {
+            margin-top: 20px;
+            padding: 12px;
+            border-radius: 8px;
+            text-align: center;
+            display: none;
+        }
+        
+        .message.error {
+            background: #f8d7da;
+            color: #721c24;
+            border: 1px solid #f5c6cb;
+        }
+        
+        .message.success {
+            background: #d4edda;
+            color: #155724;
+            border: 1px solid #c3e6cb;
+        }
+        
+        .loading {
+            display: none;
+            text-align: center;
+            color: #667eea;
+        }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <h2>🥗 NutriAI</h2>
+    
+    <div class="form-group">
+        <input id="user" placeholder="Username" type="text">
+    </div>
+    
+    <div class="form-group">
+        <input id="pass" type="password" placeholder="Password">
+    </div>
+    
+    <div class="button-group">
+        <button id="loginBtn" onclick="login()">Login</button>
+        <button id="signupBtn" onclick="signup()">Sign Up</button>
+    </div>
+    
+    <div id="message" class="message"></div>
+    <div class="loading" id="loading">Loading...</div>
+</div>
+
+<script>
+function showMessage(text, type) {
+    const msgDiv = document.getElementById("message");
+    msgDiv.textContent = text;
+    msgDiv.className = `message ${type}`;
+    msgDiv.style.display = "block";
+    setTimeout(() => {
+        msgDiv.style.display = "none";
+    }, 4000);
+}
+
+function setLoading(show) {
+    document.getElementById("loading").style.display = show ? "block" : "none";
+    document.getElementById("loginBtn").disabled = show;
+    document.getElementById("signupBtn").disabled = show;
+}
+
+function login(){
+    const username = document.getElementById("user").value.trim();
+    const password = document.getElementById("pass").value.trim();
+    
+    if (!username || !password) {
+        showMessage("Please enter username and password", "error");
+        return;
+    }
+    
+    setLoading(true);
+    
+    fetch("/login", {
+        method:"POST",
+        headers:{"Content-Type":"application/json"},
+        body:JSON.stringify({
+            username: username,
+            password: password
+        })
+    })
+    .then(res=>res.json())
+    .then(data=>{
+        setLoading(false);
+        if(data.success){
+            localStorage.setItem("loggedIn","true");
+            localStorage.setItem("userId", data.user_id || "");
+            window.location="/dashboard";
+        } else {
+            showMessage(data.message || "Invalid credentials", "error");
+        }
+    })
+    .catch(err => {
+        setLoading(false);
+        showMessage("Connection error: " + err.message, "error");
+    });
+}
+
+function signup(){
+    const username = document.getElementById("user").value.trim();
+    const password = document.getElementById("pass").value.trim();
+    
+    if (!username || !password) {
+        showMessage("Please enter username and password", "error");
+        return;
+    }
+    
+    if (password.length < 4) {
+        showMessage("Password must be at least 4 characters", "error");
+        return;
+    }
+    
+    setLoading(true);
+    
+    fetch("/signup", {
+        method:"POST",
+        headers:{"Content-Type":"application/json"},
+        body:JSON.stringify({
+            username: username,
+            password: password
+        })
+    })
+    .then(res=>res.json())
+    .then(data=>{
+        setLoading(false);
+        if(data.success){
+            showMessage("Account created! You can now login.", "success");
+            document.getElementById("user").value = "";
+            document.getElementById("pass").value = "";
+        } else {
+            showMessage(data.message || "Sign up failed", "error");
+        }
+    })
+    .catch(err => {
+        setLoading(false);
+        showMessage("Connection error: " + err.message, "error");
+    });
+}
+
+// Allow Enter key to submit
+document.getElementById("pass").addEventListener("keypress", function(e) {
+    if (e.key === "Enter") {
+        login();
+    }
+});
+</script>
+
+</body>
+</html>
