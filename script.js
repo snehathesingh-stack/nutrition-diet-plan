@@ -99,7 +99,8 @@ async function showInitialMeal() {
   document.getElementById("foodConsumed").classList.remove("hidden");
   updateProgressStep(3);
 
-  const disease = document.getElementById("disease").value;
+  const savedHealth = load("healthDetails");
+const disease = (document.getElementById("disease")?.value) || savedHealth?.disease || "general";
   const foodPref = document.querySelector('input[name="foodPref"]:checked').value;
   const allergy = document.getElementById("allergy").value;
 

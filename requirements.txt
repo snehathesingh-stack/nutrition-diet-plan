@@ -1,7 +1,7 @@
 Flask
 flask-cors
 Flask-SQLAlchemy
-google-generativeai
+google-genai
 python-dotenv
 psycopg2-binary
 gunicorn

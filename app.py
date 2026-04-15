@@ -82,9 +82,8 @@ if not API_KEY:
     print("⚠️ GEMINI_API_KEY not set - AI features will be limited")
 else:
     try:
-        import google.generativeai as genai
-        genai.configure(api_key=API_KEY)
-        model = genai.GenerativeModel("gemini-1.5-flash")
+        from google import genai as genai_new
+        client = genai_new.Client(api_key=API_KEY)
         print("✅ Gemini API Connected")
     except Exception as e:
         print(f"⚠️ Gemini initialization error: {e}")
@@ -345,8 +344,11 @@ def calculate_dds():
                 }}
                 """
 
-                response = model.generate_content(prompt)
-                text = safe_text(response)
+                response = client.models.generate_content(
+                   model="gemini-2.0-flash",
+                   contents=prompt
+                )
+                text = response.text
                 if text:
                     actual = json.loads(re.sub(r"^```json|```$", "", text.strip()))
             except Exception as e:
