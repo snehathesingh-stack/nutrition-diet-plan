@@ -113,39 +113,29 @@ const disease = (document.getElementById("disease")?.value) || savedHealth?.dise
       document.getElementById(id).innerHTML = '<i class="fas fa-spinner fa-spin"></i> Loading...';
     });
 
-    const prompt = `You are a nutritionist. Generate a personalized daily meal plan for a person with these details:
-- Health condition: ${disease}
-- Food preference: ${foodPref}
-- Allergies: ${allergy}
+    const res = await fetch("/initial-meal-plan");
 
-Return ONLY valid JSON with no markdown, no extra text, exactly this structure:
-{
-  "breakfast": "<specific breakfast recommendation>",
-  "lunch": "<specific lunch recommendation>",
-  "dinner": "<specific dinner recommendation>",
-  "snack": "<specific snack recommendation>"
-}`;
+    if (!res.ok) {
+      throw new Error("Initial meal JSON not found from backend");
+    }
 
-    const apiResponse = await fetch("https://api.anthropic.com/v1/messages", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        "anthropic-version": "2023-06-01",
-        "anthropic-dangerous-direct-browser-access": "true"
-      },
-      body: JSON.stringify({
-        model: "claude-sonnet-4-20250514",
-        max_tokens: 500,
-        messages: [{ role: "user", content: prompt }]
-      })
-    });
+    const mealPlans = await res.json();
 
-    if (!apiResponse.ok) throw new Error("API error: " + apiResponse.status);
+    const matchedPlan =
+      mealPlans.find(p =>
+        p.disease === disease &&
+        p.food_preference === foodPref &&
+        p.allergy === allergy
+      ) ||
+      mealPlans.find(p =>
+        p.disease === disease &&
+        p.food_preference === foodPref
+      ) ||
+      mealPlans[0];
 
-    const apiResult = await apiResponse.json();
-    const rawText = apiResult.content.map(b => b.text || "").join("").trim();
-    const cleanText = rawText.replace(/^```json\s*|```\s*$/g, "").trim();
-    const matchedPlan = JSON.parse(cleanText);
+    if (!matchedPlan) {
+      throw new Error("No meal plan match found");
+    }
 
     document.getElementById("initBreakfast").innerText = matchedPlan.breakfast || "-";
     document.getElementById("initLunch").innerText = matchedPlan.lunch || "-";
@@ -188,93 +178,17 @@ async function calculateDDS() {
     document.getElementById("dwDdsScore").innerHTML = '<i class="fas fa-spinner fa-spin"></i>';
     document.getElementById("riskLevel").innerHTML = '<i class="fas fa-spinner fa-spin"></i>';
 
-    // Call Anthropic API directly for nutrition analysis
-    const prompt = `You are a nutrition analysis assistant. Analyze these foods eaten today: ${JSON.stringify(foods)}
-
-The user has this health condition: ${disease}
-
-Return ONLY valid JSON with no markdown, no extra text, exactly this structure:
-{
-  "actual": {
-    "calories": <estimated total calories as number>,
-    "protein": <estimated total protein grams as number>,
-    "carbohydrates": <estimated total carbs grams as number>,
-    "fat": <estimated total fat grams as number>,
-    "fiber": <estimated total fiber grams as number>,
-    "sodium": <estimated total sodium mg as number>
-  },
-  "adaptive_meal_plan": {
-    "breakfast": "<recommended breakfast for ${disease} condition>",
-    "lunch": "<recommended lunch for ${disease} condition>",
-    "dinner": "<recommended dinner for ${disease} condition>",
-    "snack": "<recommended snack for ${disease} condition>"
-  }
-}`;
-
-    const apiResponse = await fetch("https://api.anthropic.com/v1/messages", {
+    const response = await fetch("/calculate-dds", {
       method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        "anthropic-version": "2023-06-01",
-        "anthropic-dangerous-direct-browser-access": "true"
-      },
-      body: JSON.stringify({
-        model: "claude-sonnet-4-20250514",
-        max_tokens: 1000,
-        messages: [{ role: "user", content: prompt }]
-      })
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ foods, disease })
     });
 
-    if (!apiResponse.ok) {
-      throw new Error("API error: " + apiResponse.status);
+    if (!response.ok) {
+      throw new Error("Backend error");
     }
 
-    const apiResult = await apiResponse.json();
-    const rawText = apiResult.content.map(b => b.text || "").join("").trim();
-    const cleanText = rawText.replace(/^```json\s*|```\s*$/g, "").trim();
-    const aiData = JSON.parse(cleanText);
-
-    const actual = aiData.actual;
-
-    // Recommended daily values
-    const recommended = {
-      calories: 2000,
-      protein: 75,
-      carbohydrates: 250,
-      fat: 60,
-      fiber: 30,
-      sodium: 2300
-    };
-
-    // Calculate NDV
-    const ndv = {};
-    for (const k of Object.keys(recommended)) {
-      ndv[k] = parseFloat(((actual[k] - recommended[k]) / recommended[k] * 100).toFixed(2));
-    }
-
-    // Calculate DDS
-    const dds = parseFloat((Object.values(ndv).reduce((s, v) => s + Math.abs(v), 0) / Object.keys(ndv).length).toFixed(2));
-
-    // Disease-weighted DDS
-    let dw_dds = dds;
-    if (disease === "diabetes") dw_dds = parseFloat((dds * 1.2).toFixed(2));
-    else if (disease === "hypertension") dw_dds = parseFloat((dds * 1.15).toFixed(2));
-
-    const risk_level = dds < 20 ? "Low" : dds < 40 ? "Medium" : "High";
-    const DCM_value = parseFloat((100 - dds).toFixed(2));
-    const DCM_status = DCM_value > 60 ? "Positive Momentum" : DCM_value > 40 ? "Neutral" : "Negative Momentum";
-
-    const data = {
-      DDS: dds,
-      DW_DDS: dw_dds,
-      risk_level,
-      actual,
-      recommended,
-      NDV: ndv,
-      DCM_value,
-      DCM_status,
-      adaptive_meal_plan: aiData.adaptive_meal_plan
-    };
+    const data = await response.json();
 
     // Show all result sections
     document.getElementById("ddsSection").classList.remove("hidden");
