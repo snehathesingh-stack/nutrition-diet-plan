@@ -77,6 +77,8 @@ with app.app_context():
 # GEMINI CONFIG
 # ================================
 API_KEY = os.getenv("GEMINI_API_KEY")
+client = None
+gemini_ready = False
 
 if not API_KEY:
     print("⚠️ GEMINI_API_KEY not set - AI features will be limited")
@@ -84,10 +86,12 @@ else:
     try:
         from google import genai as genai_new
         client = genai_new.Client(api_key=API_KEY)
+        gemini_ready = True
         print("✅ Gemini API Connected")
     except Exception as e:
         print(f"⚠️ Gemini initialization error: {e}")
-        model = None
+        client = None
+        gemini_ready = False
 
 # ================================
 # HEALTH CHECK
@@ -328,7 +332,7 @@ def calculate_dds():
 
         # Try to get nutrition data from Gemini
         actual = None
-        if model and API_KEY:
+        if gemini_ready and client:
             try:
                 prompt = f"""
                 Estimate nutrition for these foods: {foods}
